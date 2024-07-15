@@ -76,15 +76,18 @@ class ImageClassificationView(APIView):
             image = Image.open(image).convert('RGB')
             image = transform(image).unsqueeze(0)
 
+            class_labels = {0: 'kagami', 1: 'kuroko'}  # Example labels
+
             # 모델 예측
             with torch.no_grad():
                 outputs = model(image)
                 _, predicted = torch.max(outputs, 1)
-                predicted_class = predicted.item()
-                confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class].item()
-
+                predicted_class_index = predicted.item()
+                confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
+                predicted_class_label = class_labels[predicted_class_index]
             response_data = {
-                'predicted_class': predicted_class,
+                'predicted_class_index': predicted_class_index,
+                'predicted_class_label': predicted_class_label,
                 'confidence': confidence
             }
 
