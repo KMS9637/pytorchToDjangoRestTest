@@ -3,67 +3,33 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import ImageSerializer
 import torch
-from torchvision import transforms
+from torchvision import transforms, models
 from PIL import Image
 import io
 from torch import nn
 
-class SuperLightMobileNet(nn.Module):
-    def __init__(self, num_classes=3):
-        super(SuperLightMobileNet, self).__init__()
-        def conv_bn(inp, oup, stride):
-            return nn.Sequential(
-                nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
-                nn.BatchNorm2d(oup),
-                nn.ReLU(inplace=True)
-            )
-        def conv_dw(inp, oup, stride):
-            return nn.Sequential(
-                nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
-                nn.BatchNorm2d(inp),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
-                nn.BatchNorm2d(oup),
-                nn.ReLU(inplace=True),
-            )
-        self.num_classes = num_classes
-        self.model = nn.Sequential(
-            conv_bn(  3,  16, 2),
-            conv_dw( 16,  32, 1),
-            conv_dw( 32, 64, 2),
-            conv_dw(64, 64, 1),
-            conv_dw(64, 128, 2),
-            conv_dw(128, 128, 1),
-            conv_dw(128, 256, 2),
-            conv_dw(256, 256, 1),
-            conv_dw(256, 512, 2),
-            conv_dw(512, 512, 1),
-            conv_dw(512, 1024, 1)
-        )
-        self.gap = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(1024, self.num_classes)
-    def forward(self, x):
-        x = self.model(x)
-        x = self.gap(x)
-        x = x.view(-1, 1024)
-        x = self.fc(x)
-        return x
+# 경로 설정
+model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_10.pth"
+num_classes = 3
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-model = SuperLightMobileNet(3).to(device)
-# 모델 로드 (미리 로드해 두기)
-# model = torch.load('pytorchToDjangoTest/model_30.pth',map_location=torch.device('cpu'))
-state_dict = torch.load('pytorchToDjangoTest/model_30_team2_2.pth', map_location=torch.device('cpu'))
-model.load_state_dict(state_dict)
+# ResNet-50 모델 정의 및 로드
+model = models.resnet50(pretrained=False)
+num_ftrs = model.fc.in_features
+model.fc = torch.nn.Linear(num_ftrs, num_classes)
+
+# 모델 가중치 로드
+checkpoint = torch.load(model_weight_save_path, map_location=torch.device('cpu'))
+model.load_state_dict(checkpoint, strict=False)
 model.eval()
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
 
 class ImageClassificationView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = ImageSerializer(data=request.data)
         if serializer.is_valid():
             image = serializer.validated_data['image']
-            print(f'image: {image}')
 
             # 이미지 변환
             transform = transforms.Compose([
@@ -72,25 +38,20 @@ class ImageClassificationView(APIView):
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ])
 
-            # image = Image.open(image)
+            # 이미지 처리
             image = Image.open(image).convert('RGB')
-            image = transform(image).unsqueeze(0)
+            image = transform(image).unsqueeze(0).to(device)
 
-            class_labels = {
-                0: '화강',
-                1: '현무',
-                2: '사암',
-
-
-            }  # Example labels
-
-            # 모델 예측
+            # 예측
             with torch.no_grad():
                 outputs = model(image)
                 _, predicted = torch.max(outputs, 1)
                 predicted_class_index = predicted.item()
                 confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
+                class_labels = {0: '화강암', 1: '현무', 2: '사암'}
                 predicted_class_label = class_labels[predicted_class_index]
+
+            # 응답 데이터
             response_data = {
                 'predicted_class_index': predicted_class_index,
                 'predicted_class_label': predicted_class_label,

@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .views import ImageClassificationView
+
+from pytorchToDjangoTest.views import ImageClassificationView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/classify/', ImageClassificationView.as_view(), name='classify-image'),
