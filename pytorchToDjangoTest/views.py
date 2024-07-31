@@ -9,7 +9,7 @@ import io
 from torch import nn
 
 class SuperLightMobileNet(nn.Module):
-    def __init__(self, num_classes=1000):
+    def __init__(self, num_classes=3):
         super(SuperLightMobileNet, self).__init__()
         def conv_bn(inp, oup, stride):
             return nn.Sequential(
@@ -53,7 +53,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 model = SuperLightMobileNet(3).to(device)
 # 모델 로드 (미리 로드해 두기)
 # model = torch.load('pytorchToDjangoTest/model_30.pth',map_location=torch.device('cpu'))
-state_dict = torch.load('pytorchToDjangoTest/model_30_team2.pth', map_location=torch.device('cpu'))
+state_dict = torch.load('pytorchToDjangoTest/model_30_team2_2.pth', map_location=torch.device('cpu'))
 model.load_state_dict(state_dict)
 model.eval()
 
@@ -77,9 +77,10 @@ class ImageClassificationView(APIView):
             image = transform(image).unsqueeze(0)
 
             class_labels = {
-                0: '현무',
-                1: '사암',
-                2: '화강암',
+                0: '화강',
+                1: '현무',
+                2: '사암',
+
 
             }  # Example labels
 
