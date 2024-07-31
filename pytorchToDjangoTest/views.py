@@ -9,8 +9,8 @@ import io
 from torch import nn
 
 # 경로 설정
-model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_10.pth"
-num_classes = 3
+model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_10_team3.pth"
+num_classes = 5
 
 # ResNet-50 모델 정의 및 로드
 model = models.resnet50(pretrained=False)
@@ -48,7 +48,7 @@ class ImageClassificationView(APIView):
                 _, predicted = torch.max(outputs, 1)
                 predicted_class_index = predicted.item()
                 confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
-                class_labels = {0: '화강암', 1: '현무', 2: '사암'}
+                class_labels = {0: 'hammer', 1: 'industrial scissors', 2: 'nipper',3: 'spanner',4: 'tool saw'}
                 predicted_class_label = class_labels[predicted_class_index]
 
             # 응답 데이터
