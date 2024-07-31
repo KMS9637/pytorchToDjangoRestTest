@@ -50,7 +50,7 @@ class SuperLightMobileNet(nn.Module):
         return x
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-model = SuperLightMobileNet(2).to(device)
+model = SuperLightMobileNet(10).to(device)
 # 모델 로드 (미리 로드해 두기)
 # model = torch.load('pytorchToDjangoTest/model_30.pth',map_location=torch.device('cpu'))
 state_dict = torch.load('pytorchToDjangoTest/model_30.pth', map_location=torch.device('cpu'))
@@ -76,7 +76,19 @@ class ImageClassificationView(APIView):
             image = Image.open(image).convert('RGB')
             image = transform(image).unsqueeze(0)
 
-            class_labels = {0: 'kagami', 1: 'kuroko'}  # Example labels
+            class_labels = {
+                0: '공구 톱',
+                1: '공업용가위',
+                2: '그라인더',
+                3: '니퍼',
+                4: '드라이버',
+                5: '망치',
+                6: '몽키 렌치',
+                7: '스패너',
+                8: '전동드릴',
+                9: '줄자',
+
+            }  # Example labels
 
             # 모델 예측
             with torch.no_grad():
