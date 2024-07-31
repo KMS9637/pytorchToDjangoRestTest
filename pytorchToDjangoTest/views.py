@@ -77,16 +77,9 @@ class ImageClassificationView(APIView):
             image = transform(image).unsqueeze(0)
 
             class_labels = {
-                0: '망치',
-                1: '공업용가위',
-                2: '그라인더',
-                3: '니퍼',
-                4: '드라이버',
-                5: '공구 톱',
-                6: '몽키 렌치',
-                7: '스패너',
-                8: '전동드릴',
-                9: '줄자',
+                0: '현무',
+                1: '사암',
+                2: '화강암',
 
             }  # Example labels
 
