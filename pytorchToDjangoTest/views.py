@@ -1,63 +1,55 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .serializers import ImageSerializer
 import torch
 from torchvision import transforms, models
 from PIL import Image
-import io
-from torch import nn
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import status
+import os
 
-# 경로 설정
-model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_10_team3.pth"
+# Load the pre-trained model and accuracy
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model_path = 'pytorchToDjangoTest/best_model.pth'
+model_info = torch.load(model_path, map_location=device)
+
+# Define the number of classes (make sure this matches your dataset)
 num_classes = 5
+class_names = ['cat', 'dinos', 'dog', 'squirtle', 'tibetfox']  # Modify according to your classes
 
-# ResNet-50 모델 정의 및 로드
-model = models.resnet50(pretrained=False)
+model = models.resnet18(pretrained=False)
 num_ftrs = model.fc.in_features
-model.fc = torch.nn.Linear(num_ftrs, num_classes)
-
-# 모델 가중치 로드
-checkpoint = torch.load(model_weight_save_path, map_location=torch.device('cpu'))
-model.load_state_dict(checkpoint, strict=False)
+model.fc = torch.nn.Linear(num_ftrs, num_classes)  # Ensure the output layer matches the number of classes
+model.load_state_dict(model_info['model_state_dict'])
+model = model.to(device)
 model.eval()
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
+# Assuming the test accuracy is stored in model_info
+test_acc = model_info['test_acc'].item()
+
+# Define the data transformations
+data_transforms = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
 class ImageClassificationView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
     def post(self, request, *args, **kwargs):
-        serializer = ImageSerializer(data=request.data)
-        if serializer.is_valid():
-            image = serializer.validated_data['image']
+        if 'image' not in request.FILES:
+            return Response({"error": "No image provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # 이미지 변환
-            transform = transforms.Compose([
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ])
+        image = request.FILES['image']
+        img = Image.open(image)
+        img = data_transforms(img).unsqueeze(0).to(device)
 
-            # 이미지 처리
-            image = Image.open(image).convert('RGB')
-            image = transform(image).unsqueeze(0).to(device)
+        with torch.no_grad():
+            outputs = model(img)
+            _, preds = torch.max(outputs, 1)
 
-            # 예측
-            with torch.no_grad():
-                outputs = model(image)
-                _, predicted = torch.max(outputs, 1)
-                predicted_class_index = predicted.item()
-                confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
-                class_labels = {0: 'hammer', 1: 'industrial scissors', 2: 'nipper',3: 'spanner',4: 'tool saw'}
-                predicted_class_label = class_labels[predicted_class_index]
+        predicted_class = preds.item()
+        class_name = class_names[predicted_class]
 
-            # 응답 데이터
-            response_data = {
-                'predicted_class_index': predicted_class_index,
-                'predicted_class_label': predicted_class_label,
-                'confidence': confidence
-            }
-
-            return Response(response_data, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"predicted_class": class_name, "accuracy": test_acc})
