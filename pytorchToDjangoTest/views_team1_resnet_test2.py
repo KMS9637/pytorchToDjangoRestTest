@@ -7,17 +7,19 @@
 # from PIL import Image
 # import io
 # from torch import nn
-# import os
 #
 # # 경로 설정
-# model_weight_save_path = "pytorchToDjangoTest/model_30_team1_1.pth"
+# model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_10_team1_59per.pth"
 # num_classes = 5
 #
 # # ResNet-50 모델 정의 및 로드
 # model = models.resnet50(pretrained=False)
 # num_ftrs = model.fc.in_features
 # model.fc = torch.nn.Linear(num_ftrs, num_classes)
-# model.load_state_dict(torch.load(model_weight_save_path, map_location=torch.device('cpu')))
+#
+# # 모델 가중치 로드
+# checkpoint = torch.load(model_weight_save_path, map_location=torch.device('cpu'))
+# model.load_state_dict(checkpoint, strict=False)
 # model.eval()
 #
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
