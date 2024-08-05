@@ -7,6 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
 import os
 import timm
+import torch.nn.functional as F
 
 from pytorchToDjangoTest.serializers import ImageSerializer
 
@@ -70,14 +71,27 @@ def predict(image_path):
     vit_correct = vit_pred_idx == true_label_idx
     deit_correct = deit_pred_idx == true_label_idx
 
-    vit_accuracy = int(vit_correct)
-    deit_accuracy = int(deit_correct)
+    vit_accuracy = 100.0 if vit_correct else 0.0
+    deit_accuracy = 100.0 if deit_correct else 0.0
+
+    # Convert logits to probabilities using softmax
+    vit_probs = F.softmax(vit_output, dim=1)
+    deit_probs = F.softmax(deit_output, dim=1)
+
+    vit_pred_idx = torch.argmax(vit_probs, dim=1).item()
+    deit_pred_idx = torch.argmax(deit_probs, dim=1).item()
+
+    vit_pred_class = class_names[vit_pred_idx]
+    deit_pred_class = class_names[deit_pred_idx]
+
+    vit_match_percentage = vit_probs[0][true_label_idx].item() * 100
+    deit_match_percentage = deit_probs[0][true_label_idx].item() * 100
 
     return {
         'vit_prediction': vit_pred_class,
         'deit_prediction': deit_pred_class,
-        'vit_accuracy': vit_accuracy,
-        'deit_accuracy': deit_accuracy
+        'vit_match_percentage': f"{vit_match_percentage:.2f}%",
+        'deit_match_percentage': f"{deit_match_percentage:.2f}%",
 
             }
 
