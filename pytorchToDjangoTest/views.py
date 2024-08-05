@@ -10,34 +10,43 @@ import timm
 
 from pytorchToDjangoTest.serializers import ImageSerializer
 
-# Load the pre-trained model and accuracy
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# Define device and class names
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+num_classes = 5
+class_names = ['cat', 'dinos', 'dog', 'squirtle', 'tibetfox']
 
-vit_model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes=5)
-vit_model.load_state_dict(torch.load('pytorchToDjangoTest/vit_model.pth',map_location=torch.device('cpu')))
+# Load models with the correct number of classes
+vit_model = timm.create_model('vit_base_patch16_224', pretrained=True)
+deit_model = timm.create_model('deit_base_patch16_224', pretrained=True)
+
+# Modify the head of the models to match the number of classes
+vit_model.head = torch.nn.Linear(vit_model.head.in_features, num_classes)
+deit_model.head = torch.nn.Linear(deit_model.head.in_features, num_classes)
+
+# Load the model weights with map_location to CPU, skipping the incompatible layers
+vit_checkpoint = torch.load('pytorchToDjangoTest/vit_model.pth', map_location=torch.device('cpu'))
+deit_checkpoint = torch.load('pytorchToDjangoTest/deit_model.pth', map_location=torch.device('cpu'))
+
+# Remove the incompatible layers from the checkpoints
+vit_checkpoint = {k: v for k, v in vit_checkpoint.items() if 'head' not in k}
+deit_checkpoint = {k: v for k, v in deit_checkpoint.items() if 'head' not in k}
+
+# Load the weights
+vit_model.load_state_dict(vit_checkpoint, strict=False)
+deit_model.load_state_dict(deit_checkpoint, strict=False)
+
+# Move models to the correct device
 vit_model = vit_model.to(device)
-
-deit_model = timm.create_model('deit_base_patch16_224', pretrained=True, num_classes=5)
-deit_model.load_state_dict(torch.load('pytorchToDjangoTest/deit_model.pth.pth',map_location=torch.device('cpu')))
 deit_model = deit_model.to(device)
 
 vit_model.eval()
 deit_model.eval()
 
-
-
-# Define the number of classes (make sure this matches your dataset)
-num_classes = 5
-class_names = ['cat', 'dinos', 'dog', 'squirtle', 'tibetfox']  # Modify according to your classes
-
-# Assuming the test accuracy is stored in model_info
-# test_acc = model_info['test_acc'].item()
-
-# Define the data transformations
+# Define transformation
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
 def predict(image_path):
