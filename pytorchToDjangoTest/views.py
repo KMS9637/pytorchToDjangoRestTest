@@ -14,11 +14,11 @@ from pytorchToDjangoTest.serializers import ImageSerializer
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 vit_model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes=5)
-vit_model.load_state_dict(torch.load('pytorchToDjangoTest/vit_model.pth'))
+vit_model.load_state_dict(torch.load('pytorchToDjangoTest/vit_model.pth',map_location=torch.device('cpu')))
 vit_model = vit_model.to(device)
 
 deit_model = timm.create_model('deit_base_patch16_224', pretrained=True, num_classes=5)
-deit_model.load_state_dict(torch.load('pytorchToDjangoTest/deit_model.pth.pth'))
+deit_model.load_state_dict(torch.load('pytorchToDjangoTest/deit_model.pth.pth',map_location=torch.device('cpu')))
 deit_model = deit_model.to(device)
 
 vit_model.eval()
