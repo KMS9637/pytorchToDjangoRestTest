@@ -1,105 +1,63 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import ImageSerializer
 import torch
 from torchvision import transforms, models
 from PIL import Image
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework import status
-import os
-import timm
-import torch.nn.functional as F
+import io
+from torch import nn
 
-from pytorchToDjangoTest.serializers import ImageSerializer
-
-# Define device and class names
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# 경로 설정
+model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_48_team1_loss_2153_acc_69_52.pth"
 num_classes = 5
-class_names = ['cat', 'dinos', 'dog', 'squirtle', 'tibetfox']
 
-# Load models with the correct number of classes
-vit_model = timm.create_model('vit_base_patch16_224', pretrained=True)
-deit_model = timm.create_model('deit_base_patch16_224', pretrained=True)
+# ResNet-50 모델 정의 및 로드
+model = models.resnet50(pretrained=False)
+num_ftrs = model.fc.in_features
+model.fc = torch.nn.Linear(num_ftrs, num_classes)
 
-# Modify the head of the models to match the number of classes
-vit_model.head = torch.nn.Linear(vit_model.head.in_features, num_classes)
-deit_model.head = torch.nn.Linear(deit_model.head.in_features, num_classes)
+# 모델 가중치 로드
+checkpoint = torch.load(model_weight_save_path, map_location=torch.device('cpu'))
+model.load_state_dict(checkpoint, strict=False)
+model.eval()
 
-# Load the model weights with map_location to CPU, skipping the incompatible layers
-vit_checkpoint = torch.load('pytorchToDjangoTest/vit_model.pth', map_location=torch.device('cpu'))
-deit_checkpoint = torch.load('pytorchToDjangoTest/deit_model.pth', map_location=torch.device('cpu'))
-
-# Remove the incompatible layers from the checkpoints
-vit_checkpoint = {k: v for k, v in vit_checkpoint.items() if 'head' not in k}
-deit_checkpoint = {k: v for k, v in deit_checkpoint.items() if 'head' not in k}
-
-# Load the weights
-vit_model.load_state_dict(vit_checkpoint, strict=False)
-deit_model.load_state_dict(deit_checkpoint, strict=False)
-
-# Move models to the correct device
-vit_model = vit_model.to(device)
-deit_model = deit_model.to(device)
-
-vit_model.eval()
-deit_model.eval()
-
-# Define transformation
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-
-def predict(image_path):
-    image = Image.open(image_path)
-    image = transform(image).unsqueeze(0).to(device)
-
-    with torch.no_grad():
-        vit_output = vit_model(image)
-        deit_output = deit_model(image)
-
-    vit_pred_idx = torch.argmax(vit_output, dim=1).item()
-    deit_pred_idx = torch.argmax(deit_output, dim=1).item()
-
-    vit_pred_class = class_names[vit_pred_idx]
-    deit_pred_class = class_names[deit_pred_idx]
-
-    # Dummy true labels for illustration; replace with actual labels in practice
-    true_label_idx = 0  # Example true label
-    true_label_class = class_names[true_label_idx]
-
-    vit_correct = vit_pred_idx == true_label_idx
-    deit_correct = deit_pred_idx == true_label_idx
-
-    vit_accuracy = 100.0 if vit_correct else 0.0
-    deit_accuracy = 100.0 if deit_correct else 0.0
-
-    # Convert logits to probabilities using softmax
-    vit_probs = F.softmax(vit_output, dim=1)
-    deit_probs = F.softmax(deit_output, dim=1)
-
-    vit_pred_idx = torch.argmax(vit_probs, dim=1).item()
-    deit_pred_idx = torch.argmax(deit_probs, dim=1).item()
-
-    vit_pred_class = class_names[vit_pred_idx]
-    deit_pred_class = class_names[deit_pred_idx]
-
-    vit_match_percentage = vit_probs[0][true_label_idx].item() * 100
-    deit_match_percentage = deit_probs[0][true_label_idx].item() * 100
-
-    return {
-        'vit_prediction': vit_pred_class,
-        'deit_prediction': deit_pred_class,
-        'vit_match_percentage': f"{vit_match_percentage:.2f}%",
-        'deit_match_percentage': f"{deit_match_percentage:.2f}%",
-
-            }
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
 
 class ImageClassificationView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = ImageSerializer(data=request.data)
         if serializer.is_valid():
             image = serializer.validated_data['image']
-            predictions = predict(image)
-            return Response(predictions, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            # 이미지 변환
+            transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
+
+            # 이미지 처리
+            image = Image.open(image).convert('RGB')
+            image = transform(image).unsqueeze(0).to(device)
+
+            # 예측
+            with torch.no_grad():
+                outputs = model(image)
+                _, predicted = torch.max(outputs, 1)
+                predicted_class_index = predicted.item()
+                confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
+                class_labels = {0: '고양이', 1: '공룡', 2: '강아지',3: '꼬북이',4: '티벳여우'}
+                predicted_class_label = class_labels[predicted_class_index]
+
+            # 응답 데이터
+            response_data = {
+                'predicted_class_index': predicted_class_index,
+                'predicted_class_label': predicted_class_label,
+                'confidence': confidence
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
