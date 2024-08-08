@@ -9,7 +9,9 @@ import io
 from torch import nn
 
 # 경로 설정
+# 순서1, 모델 이름 확인 및 변경
 model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_50_loss_1101_acc_9266.pth"
+#순서2, 각 조의 클래스 갯수 맞추기
 num_classes = 10
 
 # ResNet-50 모델 정의 및 로드
@@ -48,6 +50,7 @@ class ImageClassificationView(APIView):
                 _, predicted = torch.max(outputs, 1)
                 predicted_class_index = predicted.item()
                 confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
+                # 순서3, 각 조에 맞게 라벨 확인 및 맞추기.
                 # 1조
                 # class_labels = {0: '고양이', 1: '공룡', 2: '강아지',3: '꼬북이',4: '티벳여우'}
                 #3조
