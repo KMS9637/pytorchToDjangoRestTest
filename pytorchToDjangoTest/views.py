@@ -9,7 +9,7 @@ import io
 from torch import nn
 
 # 경로 설정
-model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_43_loss_1427_team3_1_tools.pth"
+model_weight_save_path = "pytorchToDjangoTest/resnet50_epoch_50_loss_1101_acc_9266.pth"
 num_classes = 10
 
 # ResNet-50 모델 정의 및 로드
@@ -48,9 +48,15 @@ class ImageClassificationView(APIView):
                 _, predicted = torch.max(outputs, 1)
                 predicted_class_index = predicted.item()
                 confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted_class_index].item()
+                # 1조
                 # class_labels = {0: '고양이', 1: '공룡', 2: '강아지',3: '꼬북이',4: '티벳여우'}
-                class_labels = {0: '공구톱', 1: '공업용가위', 2: '그라인더', 3: '니퍼', 4: '드라이버', 5: '렌치'
-                                , 6: '망치', 7: '스패너', 8: '전동드릴', 9: '줄자'}
+                #3조
+                class_labels = {0: '공구톱', 1: '공업용가위', 2: '그라인더', 3: '니퍼', 4: '드라이버'
+                                , 5: '망치', 6: '스패너', 7: '전동드릴', 8: '줄자', 9: '버니어 캘리퍼스'}
+                #2조
+                # class_labels = {0: '업소용냉장고', 1: 'cpu', 2: '드럼세탁기', 3: '냉장고', 4: '그래픽카드', 5: '메인보드'
+                #     , 6: '전자레인지', 7: '파워', 8: '렘', 9: '스탠드에어컨', 10: 'TV', 11: '벽걸이에어컨', 12: '통돌이세탁기'}
+
                 predicted_class_label = class_labels[predicted_class_index]
 
             # 응답 데이터
